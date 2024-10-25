@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "912440276866",
+    "project_id": "rental-tax-port",
+    "storage_bucket": "rental-tax-port.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:912440276866:android:589ff0731bcdb9c3e3819b",
+        "android_client_info": {
+          "package_name": "com.rental_tax_port.rental_tax_port"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "912440276866-f37llv2to3k4if1nna6aep5mr80uti4e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8Qh1NqHrf3SVLHR86JeZ-nWL_sxyGJ9M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "912440276866-f37llv2to3k4if1nna6aep5mr80uti4e.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "912440276866-3rp075l1amqup5bg2lpr5iccfsc78eas.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.rentaltaxport.rentalTaxPort"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
