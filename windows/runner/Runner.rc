@@ -92,7 +92,7 @@ BEGIN
             VALUE "CompanyName", "com.rental_tax_port" "\0"
             VALUE "FileDescription", "rental_tax_port" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "rental_tax_port" "\0"
+            VALUE "InternalName", "com.rental_tax_port.rental_tax_port" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2024 com.rental_tax_port. All rights reserved." "\0"
             VALUE "OriginalFilename", "rental_tax_port.exe" "\0"
             VALUE "ProductName", "rental_tax_port" "\0"
