@@ -25,9 +25,9 @@ class HomeScreenState extends State<HomeScreen> {
   void _getUserType() async {
     // In a real app, you would get the user type from your auth service
     // This is a placeholder implementation
-    String type = await _auth.getUserType();
+    String? type = await _auth.getUserType();
     setState(() {
-      userType = type;
+      userType = type!;
     });
   }
 

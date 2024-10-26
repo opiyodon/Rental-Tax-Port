@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:rental_tax_port/models/property.dart';
+import 'package:rental_tax_port/models/property_type.dart';
 import 'package:rental_tax_port/services/database_service.dart';
 import 'package:rental_tax_port/services/geolocation_service.dart';
 
@@ -18,10 +19,18 @@ class AddPropertyScreenState extends State<AddPropertyScreen> {
 
   String name = '';
   String address = '';
-  PropertyType type = PropertyType.residential;
+  late PropertyType type =
+      PropertyType.types.first; // Initialize with first type
   int numberOfUnits = 1;
   double monthlyRent = 0.0;
   GeoPoint? location;
+  String selectedUnitType = ''; // Add this for unit type selection
+
+  @override
+  void initState() {
+    super.initState();
+    selectedUnitType = type.unitTypes.first; // Initialize with first unit type
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,16 +68,38 @@ class AddPropertyScreenState extends State<AddPropertyScreen> {
               DropdownButtonFormField<PropertyType>(
                 value: type,
                 decoration: const InputDecoration(labelText: 'Property Type'),
-                items: PropertyType.values.map((PropertyType value) {
+                items: PropertyType.types.map((PropertyType value) {
                   return DropdownMenuItem<PropertyType>(
                     value: value,
-                    child: Text(value.toString().split('.').last),
+                    child: Text(value.name),
                   );
                 }).toList(),
                 onChanged: (PropertyType? newValue) {
                   setState(() {
-                    type = newValue!;
+                    if (newValue != null) {
+                      type = newValue;
+                      // Reset unit type when property type changes
+                      selectedUnitType = newValue.unitTypes.first;
+                    }
                   });
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedUnitType,
+                decoration: const InputDecoration(labelText: 'Unit Type'),
+                items: type.unitTypes.map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      selectedUnitType = newValue;
+                    });
+                  }
                 },
               ),
               TextFormField(
@@ -118,7 +149,8 @@ class AddPropertyScreenState extends State<AddPropertyScreen> {
 
   void _getCurrentLocation() async {
     try {
-      GeoPoint currentLocation = (await _geolocationService.getCurrentLocation()) as GeoPoint;
+      GeoPoint currentLocation =
+          (await _geolocationService.getCurrentLocation()) as GeoPoint;
       setState(() {
         location = currentLocation;
       });

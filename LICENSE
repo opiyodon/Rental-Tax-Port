@@ -1,1 +1,86 @@
-404: Not Found
+# Rental Tax Pot Software License
+
+Version 1.0, [Current Year]
+
+## Copyright Notice
+Copyright (c) [Current Year] [Your Name/Organization Name]. All Rights Reserved.
+
+## Preamble
+This Software License Agreement (the "License") applies to the Rental Tax Pot software system (the "Software"), a proprietary tax management and property rental system developed for use in Kenya in cooperation with the Kenya Revenue Authority.
+
+## Terms and Conditions
+
+1. Definitions
+   - "Software" refers to the Rental Tax Pot application, including all source code, documentation, and associated materials.
+   - "Copyright Holder" refers to [Your Name/Organization Name].
+   - "User" refers to any individual or entity granted access to use the Software under the terms of this License.
+   - "KRA" refers to the Kenya Revenue Authority.
+
+2. Grant of License
+   The Copyright Holder hereby grants a restricted license to use the Software subject to the following conditions:
+   
+   a) The Software may only be used in Kenya for the purpose of managing rental properties and associated tax obligations.
+   
+   b) Any deployment or modification of the Software requires explicit written authorization from both the Copyright Holder and the Kenya Revenue Authority.
+   
+   c) No rights are granted to sublicense, distribute, or create derivative works based on the Software without explicit written permission.
+
+3. Restrictions
+   Users may NOT:
+   - Modify, reverse engineer, decompile, or disassemble the Software
+   - Remove or alter any copyright notices or watermarks
+   - Use the Software outside of Kenya
+   - Transfer rights to the Software
+   - Create derivative works based on the Software
+   - Use the Software for any purpose not explicitly authorized
+   - Share access credentials or bypass security measures
+
+4. Security and Compliance
+   a) Users must:
+      - Maintain the security integrity of the Software
+      - Report any security vulnerabilities immediately
+      - Comply with all KRA regulations and policies
+      - Maintain confidentiality of all tax-related data
+      
+   b) Any attempt to circumvent security measures or tamper with the Software's functionality constitutes a violation of this License.
+
+5. Intellectual Property
+   - All intellectual property rights in the Software remain with the Copyright Holder
+   - All tax-related data processing methodologies remain the property of the KRA
+   - Patent rights, trademarks, and other intellectual property rights related to the Software are reserved
+
+6. Updates and Modifications
+   - Only authorized updates from the Copyright Holder may be applied to the Software
+   - All updates must be verified and approved by the KRA before deployment
+   - Users must maintain the latest approved version of the Software
+
+7. Warranty Disclaimer
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THE COPYRIGHT HOLDER MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+8. Limitation of Liability
+   IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OR INABILITY TO USE THE SOFTWARE.
+
+9. Termination
+   - This License automatically terminates upon any breach of its terms
+   - Upon termination, all use of the Software must cease immediately
+   - Sections 3, 4, 5, 7, and 8 survive termination
+
+10. Governing Law
+    This License shall be governed by and construed in accordance with the laws of Kenya. Any disputes shall be subject to the exclusive jurisdiction of the courts of Kenya.
+
+11. Audit Rights
+    The Copyright Holder and KRA reserve the right to audit Software deployment and usage for compliance with this License.
+
+## Contact Information
+For licensing inquiries:
+[Your Contact Information]
+[Your Organization]
+[Address]
+[Email]
+[Phone]
+
+## Acknowledgment
+By using the Software, you acknowledge that you have read, understood, and agree to be bound by the terms of this License.
+
+---
+End of License
