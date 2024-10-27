@@ -1,9 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Sign up new user
   Future<User?> signUp(
@@ -50,6 +52,84 @@ class AuthService {
     } catch (e) {
       print('Error during sign in: ${e.toString()}');
       rethrow;
+    }
+  }
+
+  // Sign In with Google
+  Future<User?> signInWithGoogle(String userType) async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null;
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      UserCredential result = await _auth.signInWithCredential(credential);
+      User? user = result.user;
+
+      if (user != null) {
+        // Check if user exists in Firestore
+        DocumentSnapshot doc =
+            await _firestore.collection('users').doc(user.uid).get();
+
+        if (!doc.exists) {
+          // Create basic user data from Google account
+          Map<String, dynamic> userData = {
+            'email': user.email ?? '',
+            'fullName': user.displayName ?? '',
+            'phoneNumber': user.phoneNumber ?? '',
+            'idNumber': '',
+            'userType': userType,
+            'registrationDate': DateTime.now().toIso8601String(),
+            'isVerified': user.emailVerified,
+            // Add empty fields based on user type
+            ...getEmptyFieldsForUserType(userType),
+          };
+
+          await _firestore.collection('users').doc(user.uid).set(userData);
+        }
+        return user;
+      }
+      return null;
+    } catch (e) {
+      print('Error during Google sign in: ${e.toString()}');
+      rethrow;
+    }
+  }
+
+  Map<String, dynamic> getEmptyFieldsForUserType(String userType) {
+    switch (userType) {
+      case 'Landlord':
+        return {
+          'kraPin': '',
+          'physicalAddress': '',
+          'isNonResident': false,
+        };
+      case 'Tenant':
+        return {
+          'currentAddress': '',
+          'emergencyContact': {
+            'name': '',
+            'phone': '',
+          },
+        };
+      case 'Agent':
+        return {
+          'companyName': '',
+          'licenseNumber': '',
+          'businessAddress': '',
+        };
+      case 'Admin':
+        return {
+          'department': '',
+          'employeeId': '',
+        };
+      default:
+        return {};
     }
   }
 
@@ -128,7 +208,8 @@ class AuthService {
   }
 
   // Update user profile
-  Future<void> updateUserProfile(Map<String, dynamic> userData) async {
+  Future<void> updateUserProfile(Map<String, dynamic> userData,
+      Map<String, dynamic> additionalData) async {
     try {
       User? currentUser = _auth.currentUser;
       if (currentUser != null) {
