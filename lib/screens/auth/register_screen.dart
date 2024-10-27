@@ -276,7 +276,7 @@ class RegisterScreenState extends State<RegisterScreen>
               FadeTransition(
             opacity: animation,
             child: const LoadingScreen(
-              message: "Creating your account...",
+              message: "Creating your account",
             ),
           ),
           transitionDuration: const Duration(milliseconds: 500),
@@ -440,12 +440,10 @@ class RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-// Modified Google Sign In handler with simplified new user registration
   void _handleGoogleSignIn() async {
-    // First show the user type selection dialog
     final selectedUserType = await _showUserTypeDialog();
 
-    if (selectedUserType == null) return; // User cancelled
+    if (selectedUserType == null) return;
 
     if (!_checkRateLimit()) return;
 
@@ -455,7 +453,6 @@ class RegisterScreenState extends State<RegisterScreen>
     });
 
     try {
-      // Show loading screen with animation
       Navigator.push(
         context,
         PageRouteBuilder(
@@ -463,16 +460,29 @@ class RegisterScreenState extends State<RegisterScreen>
               FadeTransition(
             opacity: animation,
             child: const LoadingScreen(
-              message: "Signing in with Google...",
+              message: "Signing in with Google",
             ),
           ),
           transitionDuration: const Duration(milliseconds: 500),
         ),
       );
 
-      // Get Google Sign In result
-      final UserCredential? userCredential =
-          (await _auth.signInWithGoogle(selectedUserType)) as UserCredential?;
+      UserCredential? userCredential;
+
+      if (selectedUserType == 'Admin') {
+        final adminCode = await _showAdminCodeDialog();
+        if (adminCode == null) {
+          Navigator.pop(context);
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+
+        userCredential = await _auth.signInWithGoogleAdmin(adminCode);
+      } else {
+        userCredential = await _auth.signInWithGoogle(selectedUserType);
+      }
 
       if (userCredential?.user != null) {
         final user = userCredential!.user!;
@@ -483,8 +493,9 @@ class RegisterScreenState extends State<RegisterScreen>
             .doc(user.uid)
             .get();
 
+        // Handle new user registration
         if (!userDoc.exists) {
-          // New user registration
+          // Create new user data
           Map<String, dynamic> userData = {
             'email': user.email ?? '',
             'fullName': user.displayName ?? '',
@@ -495,7 +506,7 @@ class RegisterScreenState extends State<RegisterScreen>
             'isVerified': user.emailVerified,
           };
 
-          // Add role-specific empty fields based on user type
+          // Add role-specific fields
           switch (selectedUserType) {
             case 'Landlord':
               userData.addAll({
@@ -521,29 +532,27 @@ class RegisterScreenState extends State<RegisterScreen>
               });
               break;
             case 'Admin':
-              // For admin, we still need to verify the access code
-              final adminCode = await _showAdminCodeDialog();
-              if (adminCode == null ||
-                  !await _auth.verifyAdminCode(adminCode)) {
-                Navigator.pop(context); // Pop loading screen
-                throw Exception('Invalid admin access code');
-              }
               userData.addAll({
                 'department': '',
                 'employeeId': '',
+                'adminVerified': true,
               });
               break;
           }
 
-          // Create new user document
+          // Save new user data
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .set(userData);
-        } else {
-          // Existing user - get their stored user type
 
-          // Update last login
+          // Update userDoc with the new data
+          userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+        } else {
+          // For existing users, update last login
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
@@ -552,32 +561,27 @@ class RegisterScreenState extends State<RegisterScreen>
           });
         }
 
-        // Pop loading screen
-        Navigator.pop(context);
+        // Get user type from Firestore document
+        String userType = userDoc.get('userType') as String;
+        bool isAdminVerified = userType == 'Admin'
+            ? (userDoc.get('adminVerified') as bool? ?? false)
+            : true;
 
-        // Successful registration/login animation
-        await _rotateController.forward();
-
-        // Navigate to appropriate screen based on user type
-        Widget destinationScreen;
-        switch (selectedUserType) {
-          case 'Landlord':
-            destinationScreen = const LandlordDashboard();
-            break;
-          case 'Tenant':
-            destinationScreen = const TenantDashboard();
-            break;
-          case 'Agent':
-            destinationScreen = const AgentDashboard();
-            break;
-          case 'Admin':
-            destinationScreen = const AdminDashboard();
-            break;
-          default:
-            throw Exception('Invalid user type');
+        // Verify admin status
+        if (userType == 'Admin' && !isAdminVerified) {
+          await _auth.signOut();
+          setState(() {
+            error = 'Admin verification failed';
+            _isLoading = false;
+          });
+          return;
         }
 
-        // Navigate to appropriate home screen with animation
+        Navigator.pop(context); // Pop loading screen
+
+        // Navigate to appropriate dashboard
+        Widget destinationScreen = _getDestinationScreen(userType);
+
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
@@ -593,21 +597,35 @@ class RegisterScreenState extends State<RegisterScreen>
           ),
         );
       } else {
-        // Pop loading screen and handle failure
         Navigator.pop(context);
+        setState(() {
+          error = 'Failed to sign in with Google';
+          _isLoading = false;
+        });
         _handleFailedAttempt();
       }
     } catch (e) {
-      // Pop loading screen
       Navigator.pop(context);
       setState(() {
-        error = 'Failed to sign in with Google: ${e.toString()}';
-      });
-      _handleFailedAttempt();
-    } finally {
-      setState(() {
+        error = 'Error during sign in: ${e.toString()}';
         _isLoading = false;
       });
+      _handleFailedAttempt();
+    }
+  }
+
+  Widget _getDestinationScreen(String userType) {
+    switch (userType) {
+      case 'Landlord':
+        return const LandlordDashboard();
+      case 'Tenant':
+        return const TenantDashboard();
+      case 'Agent':
+        return const AgentDashboard();
+      case 'Admin':
+        return const AdminDashboard();
+      default:
+        throw Exception('Invalid user type');
     }
   }
 
