@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-enum PropertyType { commercial, residential, mixed }
+import 'package:rental_tax_port/models/property_type.dart';
 
 class Property {
   final String? id;
@@ -31,7 +30,7 @@ class Property {
       'name': name,
       'address': address,
       'location': location,
-      'type': type.toString().split('.').last,
+      'type': type.name, // Store the name of the type
       'numberOfUnits': numberOfUnits,
       'monthlyRent': monthlyRent,
       'isVacant': isVacant,
@@ -45,9 +44,10 @@ class Property {
       name: map['name'],
       address: map['address'],
       location: map['location'],
-      type: PropertyType.values.firstWhere((e) => e.toString().split('.').last == map['type']),
+      type:
+          PropertyType.fromString(map['type']), // Use the new fromString method
       numberOfUnits: map['numberOfUnits'],
-      monthlyRent: map['monthlyRent'],
+      monthlyRent: map['monthlyRent'].toDouble(),
       isVacant: map['isVacant'],
     );
   }
