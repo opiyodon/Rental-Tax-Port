@@ -1,12 +1,19 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:rental_tax_port/screens/admin/admin_dashboard.dart';
+import 'package:rental_tax_port/screens/agent/agent_dashboard.dart';
 import 'package:rental_tax_port/screens/home/home_screen.dart';
+import 'package:rental_tax_port/screens/landlord/landlord_dashboard.dart';
+import 'package:rental_tax_port/screens/tenant/tenant_dashboard.dart';
 import 'package:rental_tax_port/services/auth_service.dart';
 import 'package:rental_tax_port/theme.dart';
 import 'package:rental_tax_port/utils/input_validators.dart';
 import 'package:rental_tax_port/widgets/custom_text_field.dart';
 import 'package:rental_tax_port/screens/loading_screen.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:rental_tax_port/widgets/error_message.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -60,7 +67,6 @@ class RegisterScreenState extends State<RegisterScreen>
       TextEditingController(); // Added missing controller
 
   // Property Fields (for Landlords)
-  final List<String> _selectedUnitTypes = [];
 
   // Tenant Fields
   final TextEditingController _emergencyContactController =
@@ -373,6 +379,272 @@ class RegisterScreenState extends State<RegisterScreen>
     });
   }
 
+  // Add this method to show user type selection dialog
+  Future<String?> _showUserTypeDialog() {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        String? selectedType = userType;
+
+        return AlertDialog(
+          title: const Text('Select User Type'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Theme.of(context).cardColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedType,
+                    isExpanded: true,
+                    items: ['Landlord', 'Tenant', 'Agent', 'Admin']
+                        .map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedType = newValue!;
+                      });
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('Continue'),
+              onPressed: () => Navigator.of(context).pop(selectedType),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+// Modified Google Sign In handler with simplified new user registration
+  void _handleGoogleSignIn() async {
+    // First show the user type selection dialog
+    final selectedUserType = await _showUserTypeDialog();
+
+    if (selectedUserType == null) return; // User cancelled
+
+    if (!_checkRateLimit()) return;
+
+    setState(() {
+      _isLoading = true;
+      error = '';
+    });
+
+    try {
+      // Show loading screen with animation
+      Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              FadeTransition(
+            opacity: animation,
+            child: const LoadingScreen(
+              message: "Signing in with Google...",
+            ),
+          ),
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+
+      // Get Google Sign In result
+      final UserCredential? userCredential =
+          (await _auth.signInWithGoogle(selectedUserType)) as UserCredential?;
+
+      if (userCredential?.user != null) {
+        final user = userCredential!.user!;
+
+        // Check if user exists in Firestore
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (!userDoc.exists) {
+          // New user registration
+          Map<String, dynamic> userData = {
+            'email': user.email ?? '',
+            'fullName': user.displayName ?? '',
+            'phoneNumber': user.phoneNumber ?? '',
+            'userType': selectedUserType,
+            'registrationDate': DateTime.now().toIso8601String(),
+            'lastLogin': DateTime.now().toIso8601String(),
+            'isVerified': user.emailVerified,
+          };
+
+          // Add role-specific empty fields based on user type
+          switch (selectedUserType) {
+            case 'Landlord':
+              userData.addAll({
+                'kraPin': '',
+                'physicalAddress': '',
+                'isNonResident': false,
+              });
+              break;
+            case 'Tenant':
+              userData.addAll({
+                'currentAddress': '',
+                'emergencyContact': {
+                  'name': '',
+                  'phone': '',
+                },
+              });
+              break;
+            case 'Agent':
+              userData.addAll({
+                'companyName': '',
+                'licenseNumber': '',
+                'businessAddress': '',
+              });
+              break;
+            case 'Admin':
+              // For admin, we still need to verify the access code
+              final adminCode = await _showAdminCodeDialog();
+              if (adminCode == null ||
+                  !await _auth.verifyAdminCode(adminCode)) {
+                Navigator.pop(context); // Pop loading screen
+                throw Exception('Invalid admin access code');
+              }
+              userData.addAll({
+                'department': '',
+                'employeeId': '',
+              });
+              break;
+          }
+
+          // Create new user document
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set(userData);
+        } else {
+          // Existing user - get their stored user type
+
+          // Update last login
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
+            'lastLogin': DateTime.now().toIso8601String(),
+          });
+        }
+
+        // Pop loading screen
+        Navigator.pop(context);
+
+        // Successful registration/login animation
+        await _rotateController.forward();
+
+        // Navigate to appropriate screen based on user type
+        Widget destinationScreen;
+        switch (selectedUserType) {
+          case 'Landlord':
+            destinationScreen = const LandlordDashboard();
+            break;
+          case 'Tenant':
+            destinationScreen = const TenantDashboard();
+            break;
+          case 'Agent':
+            destinationScreen = const AgentDashboard();
+            break;
+          case 'Admin':
+            destinationScreen = const AdminDashboard();
+            break;
+          default:
+            throw Exception('Invalid user type');
+        }
+
+        // Navigate to appropriate home screen with animation
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: animation,
+                child: destinationScreen,
+              ),
+            ),
+            transitionDuration: const Duration(milliseconds: 800),
+          ),
+        );
+      } else {
+        // Pop loading screen and handle failure
+        Navigator.pop(context);
+        _handleFailedAttempt();
+      }
+    } catch (e) {
+      // Pop loading screen
+      Navigator.pop(context);
+      setState(() {
+        error = 'Failed to sign in with Google: ${e.toString()}';
+      });
+      _handleFailedAttempt();
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+// Add this method to show admin code input dialog
+  Future<String?> _showAdminCodeDialog() {
+    final adminCodeController = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Admin Access Code'),
+          content: TextField(
+            controller: adminCodeController,
+            decoration: const InputDecoration(
+              labelText: 'Enter admin access code',
+              border: OutlineInputBorder(),
+            ),
+            obscureText: true,
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('Verify'),
+              onPressed: () =>
+                  Navigator.of(context).pop(adminCodeController.text),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   List<Step> buildSteps() {
     return [
       Step(
@@ -392,6 +664,7 @@ class RegisterScreenState extends State<RegisterScreen>
                 nextFocusNode: _focusNodes[1],
                 validator: InputValidators.validateEmail,
               ),
+              const SizedBox(height: 16),
               CustomTextField(
                 controller: _passwordController,
                 label: 'Password',
@@ -401,6 +674,7 @@ class RegisterScreenState extends State<RegisterScreen>
                 nextFocusNode: _focusNodes[2],
                 validator: InputValidators.validatePassword,
               ),
+              const SizedBox(height: 16),
               CustomTextField(
                 controller: _confirmPasswordController,
                 label: 'Confirm Password',
@@ -417,9 +691,7 @@ class RegisterScreenState extends State<RegisterScreen>
         isActive: _currentStep >= 0,
       ),
       Step(
-        title: const Text('Details',
-            style: TextStyle(
-                fontSize: 13)), // Changed from 'Personal Details' to 'Details'
+        title: const Text('Details', style: TextStyle(fontSize: 13)),
         content: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
@@ -432,7 +704,7 @@ class RegisterScreenState extends State<RegisterScreen>
                   prefixIcon: Icons.person,
                   focusNode: _focusNodes[3],
                   nextFocusNode: _focusNodes[4],
-                  validator: null,
+                  validator: InputValidators.validateFullName,
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -442,7 +714,7 @@ class RegisterScreenState extends State<RegisterScreen>
                   keyboardType: TextInputType.phone,
                   focusNode: _focusNodes[4],
                   nextFocusNode: _focusNodes[5],
-                  validator: null,
+                  validator: InputValidators.validatePhone,
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -452,7 +724,7 @@ class RegisterScreenState extends State<RegisterScreen>
                   keyboardType: TextInputType.number,
                   focusNode: _focusNodes[5],
                   nextFocusNode: _focusNodes[6],
-                  validator: null,
+                  validator: InputValidators.validateIdNumber,
                 ),
                 const SizedBox(height: 16),
                 _buildUserTypeSelector(),
@@ -463,9 +735,7 @@ class RegisterScreenState extends State<RegisterScreen>
         isActive: _currentStep >= 1,
       ),
       Step(
-        title: const Text('More Info',
-            style: TextStyle(
-                fontSize: 13)), // Changed from 'Additional Info' to 'More Info'
+        title: const Text('More Info', style: TextStyle(fontSize: 13)),
         content: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
@@ -583,7 +853,7 @@ class RegisterScreenState extends State<RegisterScreen>
               controller: _physicalAddressController,
               label: 'Physical Address',
               prefixIcon: Icons.location_on,
-              validator: null,
+              validator: InputValidators.validateAddress,
             ),
             const SizedBox(height: 16),
             CheckboxListTile(
@@ -602,14 +872,14 @@ class RegisterScreenState extends State<RegisterScreen>
               controller: _currentAddressController,
               label: 'Current Address',
               prefixIcon: Icons.home,
-              validator: null,
+              validator: InputValidators.validateAddress,
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _emergencyContactController,
               label: 'Emergency Contact Name',
               prefixIcon: Icons.contact_phone,
-              validator: null,
+              validator: InputValidators.validateEmergencyContact,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -628,21 +898,21 @@ class RegisterScreenState extends State<RegisterScreen>
               controller: _companyNameController,
               label: 'Company Name',
               prefixIcon: Icons.business,
-              validator: null,
+              validator: InputValidators.validateCompanyName,
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _licenseNumberController,
               label: 'License Number',
               prefixIcon: Icons.badge,
-              validator: null,
+              validator: InputValidators.validateLicenseNumber,
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _businessAddressController,
               label: 'Business Address',
               prefixIcon: Icons.location_on,
-              validator: null,
+              validator: InputValidators.validateAddress,
             ),
           ],
         );
@@ -655,21 +925,21 @@ class RegisterScreenState extends State<RegisterScreen>
               label: 'Admin Access Code',
               prefixIcon: Icons.security,
               isPassword: true,
-              validator: null,
+              validator: InputValidators.validateAdminCode,
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _departmentController,
               label: 'Department',
               prefixIcon: Icons.business_center,
-              validator: null,
+              validator: InputValidators.validateDepartment,
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _employeeIdController,
               label: 'Employee ID',
               prefixIcon: Icons.badge,
-              validator: null,
+              validator: InputValidators.validateEmployeeId,
             ),
           ],
         );
@@ -679,92 +949,70 @@ class RegisterScreenState extends State<RegisterScreen>
     }
   }
 
-  Widget buildUnitTypesSelector() {
-    List<String> unitTypes = [
-      'Single Room',
-      'Bedsitter',
-      '1 Bedroom',
-      '2 Bedroom',
-      '3 Bedroom',
-      '4 Bedroom',
-      '5 Bedroom',
-      '6 Bedroom',
-      'Bungalow',
-      'Hotel Room',
-      'Shop',
-      'Office',
-      'Godown',
-      'Industrial Space',
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
-            'Unit Types Available',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.textDark,
-                  fontWeight: FontWeight.w600,
-                ),
+// Add this method to build the login link
+  Widget _buildLoginLink() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Already have an account? ',
+            style: TextStyle(color: Colors.grey[600]),
           ),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: GridView.builder(
-            shrinkWrap: true, // Important to work inside Column
-            physics:
-                const NeverScrollableScrollPhysics(), // Disable grid scrolling
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, // Number of chips per row
-              childAspectRatio: 3, // Adjust this value to control chip height
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: unitTypes.length,
-            itemBuilder: (context, index) {
-              final type = unitTypes[index];
-              final isSelected = _selectedUnitTypes.contains(type);
-
-              return FilterChip(
-                label: Text(type),
-                selected: isSelected,
-                onSelected: (bool selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedUnitTypes.add(type);
-                    } else {
-                      _selectedUnitTypes.remove(type);
-                    }
-                  });
-                },
-                backgroundColor: Colors.white,
-                selectedColor: AppColors.primaryGreen,
-                checkmarkColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : AppColors.textDark,
-                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: isSelected
-                        ? AppColors.primaryGreen
-                        : AppColors.subtleGrey,
-                    width: 1,
-                  ),
-                ),
-                elevation: isSelected ? 2 : 0,
-                pressElevation: 4,
-              );
+          GestureDetector(
+            onTap: () {
+              Navigator.pushReplacementNamed(context, '/login');
             },
+            child: Text(
+              'Login',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildGoogleSignInButton() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      child: ElevatedButton.icon(
+        icon: Image.asset(
+          'assets/images/google.png',
+          height: 20,
+          width: 20,
         ),
-      ],
+        label: Text(
+          'Continue with Google',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: AppColors.textDark,
+                fontWeight: FontWeight.w500,
+              ),
+        ),
+        onPressed: _isLoading ? null : _handleGoogleSignIn,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.textDark,
+          elevation: 1,
+          shadowColor: Colors.black.withOpacity(0.15),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 12,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+              color: Colors.grey.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          minimumSize: const Size(double.infinity, 48),
+        ),
+      ),
     );
   }
 
@@ -796,6 +1044,20 @@ class RegisterScreenState extends State<RegisterScreen>
                   ),
                 ),
               ),
+              buildGoogleSignInButton(),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('OR', style: TextStyle(color: Colors.grey)),
+                    ),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+              ),
               Expanded(
                 child: FadeInUp(
                   duration: const Duration(milliseconds: 800),
@@ -817,6 +1079,7 @@ class RegisterScreenState extends State<RegisterScreen>
                   ),
                 ),
               ),
+              _buildLoginLink(),
               if (error.isNotEmpty)
                 FadeIn(
                   duration: const Duration(milliseconds: 300),
@@ -1026,33 +1289,17 @@ class RegisterScreenState extends State<RegisterScreen>
   }
 
   Widget _buildErrorMessage() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.error.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.error_outline,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                error,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontSize: 14.0,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    if (error.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return AnimatedErrorMessage(
+      error: error,
+      onDismissed: () {
+        setState(() {
+          error = '';
+        });
+      },
     );
   }
 }

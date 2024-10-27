@@ -44,17 +44,6 @@ class InputValidators {
     return null;
   }
 
-  static String? validateKraPin(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'KRA PIN is required';
-    }
-    final kraRegex = RegExp(r'^[A-Z][0-9]{9}[A-Z]$');
-    if (!kraRegex.hasMatch(value)) {
-      return 'Enter a valid KRA PIN (Format: A123456789B)';
-    }
-    return null;
-  }
-
   static String? validatePhone(String? value) {
     if (value == null || value.isEmpty) {
       return 'Phone number is required';
@@ -105,6 +94,17 @@ class InputValidators {
     return null;
   }
 
+  static String? validateKraPin(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'KRA PIN is required';
+    }
+    final kraRegex = RegExp(r'^[A-Z][0-9]{9}[A-Z]$');
+    if (!kraRegex.hasMatch(value)) {
+      return 'Enter a valid KRA PIN (Format: A123456789B)';
+    }
+    return null;
+  }
+
   static String? validateCompanyName(String? value) {
     if (value == null || value.isEmpty) {
       return 'Company name is required';
@@ -137,6 +137,10 @@ class InputValidators {
     if (value.length < 8) {
       return 'Admin code must be at least 8 characters';
     }
+    final adminCodeRegex = RegExp(r'^[A-Z0-9]{8,}$');
+    if (!adminCodeRegex.hasMatch(value)) {
+      return 'Enter a valid admin code (uppercase letters and numbers only)';
+    }
     return null;
   }
 
@@ -147,6 +151,34 @@ class InputValidators {
     final employeeIdRegex = RegExp(r'^EMP[0-9]{6}$');
     if (!employeeIdRegex.hasMatch(value)) {
       return 'Enter a valid Employee ID (Format: EMPXXXXXX)';
+    }
+    return null;
+  }
+
+  static String? validateEmergencyContact(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Emergency contact name is required';
+    }
+    if (value.length < 3) {
+      return 'Name must be at least 3 characters';
+    }
+    final nameRegex = RegExp(r'^[a-zA-Z\s]{3,50}$');
+    if (!nameRegex.hasMatch(value)) {
+      return 'Enter a valid name (letters only)';
+    }
+    return null;
+  }
+
+  static String? validateDepartment(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Department is required';
+    }
+    if (value.length < 2) {
+      return 'Department must be at least 2 characters';
+    }
+    final deptRegex = RegExp(r'^[a-zA-Z\s&-]{2,30}$');
+    if (!deptRegex.hasMatch(value)) {
+      return 'Enter a valid department name';
     }
     return null;
   }
