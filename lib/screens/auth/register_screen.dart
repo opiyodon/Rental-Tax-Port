@@ -3,7 +3,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:rental_tax_port/screens/home/home_screen.dart';
 import 'package:rental_tax_port/services/auth_service.dart';
 import 'package:rental_tax_port/theme.dart';
+import 'package:rental_tax_port/utils/input_validators.dart';
 import 'package:rental_tax_port/widgets/custom_text_field.dart';
+import 'package:rental_tax_port/screens/loading_screen.dart';
+import 'package:animate_do/animate_do.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,14 +16,22 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class RegisterScreenState extends State<RegisterScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
+  // Changed from SingleTickerProviderStateMixin
   final AuthService _auth = AuthService();
   final _formKey = GlobalKey<FormState>();
   final List<FocusNode> _focusNodes = [];
 
-  late AnimationController _animationController;
+  // Animation controllers
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late AnimationController _scaleController;
+  late AnimationController _rotateController;
+
+  // Animations
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  late Animation<double> _scaleAnimation;
 
   String userType = 'Tenant';
   String error = '';
@@ -31,6 +42,8 @@ class RegisterScreenState extends State<RegisterScreen>
   // Track failed attempts for rate limiting
   int _failedAttempts = 0;
   DateTime? _lastAttemptTime;
+  static const int _maxAttempts = 3;
+  static const int _lockoutMinutes = 15;
 
   // Common Fields
   final TextEditingController _emailController = TextEditingController();
@@ -72,7 +85,7 @@ class RegisterScreenState extends State<RegisterScreen>
 
   final String onboardingSvg = '''
 <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <!-- Define gradients -->
+  <!-- Define gradients using the app's theme colors -->
   <defs>
     <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#4CAF50;stop-opacity:1" />
@@ -83,30 +96,30 @@ class RegisterScreenState extends State<RegisterScreen>
       <stop offset="100%" style="stop-color:#FF9800;stop-opacity:0.2" />
     </linearGradient>
   </defs>
-
-  <!-- Background card -->
-  <rect width="180" height="180" x="10" y="10" rx="16" fill="white" stroke="url(#grad)" stroke-width="2"/>
   
-  <!-- Form background -->
-  <rect x="35" y="60" width="130" height="110" rx="12" fill="url(#grad2)"/>
+  <!-- Background card with balanced padding -->
+  <rect width="160" height="160" x="20" y="20" rx="16" fill="white" stroke="url(#grad)" stroke-width="2"/>
   
-  <!-- User avatar circle -->
-  <circle cx="100" cy="45" r="25" fill="url(#grad)" opacity="0.9"/>
-  <path d="M100 35 Q100 25 110 35 T120 35 Q120 45 110 50 T90 45 Q90 35 100 35" fill="white"/>
+  <!-- Form background moved up slightly -->
+  <rect x="35" y="60" width="130" height="90" rx="12" fill="url(#grad2)"/>
   
-  <!-- Form lines -->
-  <rect x="45" y="100" width="110" height="8" rx="4" fill="url(#grad)" opacity="0.7"/>
-  <rect x="45" y="120" width="110" height="8" rx="4" fill="url(#grad)" opacity="0.5"/>
-  <rect x="45" y="140" width="110" height="8" rx="4" fill="url(#grad)" opacity="0.3"/>
+  <!-- User avatar circle moved up slightly -->
+  <circle cx="100" cy="50" r="22" fill="url(#grad)" opacity="0.9"/>
+  <path d="M100 42 Q100 34 108 42 T116 42 Q116 50 108 54 T92 50 Q92 42 100 42" fill="white"/>
   
-  <!-- Submit button -->
-  <rect x="60" y="160" width="80" height="24" rx="12" fill="url(#grad)"/>
-  <rect x="75" y="168" width="50" height="8" rx="4" fill="white"/>
+  <!-- Form lines moved up -->
+  <rect x="45" y="88" width="110" height="8" rx="4" fill="url(#grad)" opacity="0.7"/>
+  <rect x="45" y="103" width="110" height="8" rx="4" fill="url(#grad)" opacity="0.5"/>
+  <rect x="45" y="118" width="110" height="8" rx="4" fill="url(#grad)" opacity="0.3"/>
   
-  <!-- Plus icon -->
-  <circle cx="160" cy="40" r="15" fill="url(#grad)"/>
-  <rect x="152" y="38" width="16" height="4" rx="2" fill="white"/>
-  <rect x="158" y="32" width="4" height="16" rx="2" fill="white"/>
+  <!-- Submit button moved up -->
+  <rect x="60" y="135" width="80" height="24" rx="12" fill="url(#grad)"/>
+  <rect x="75" y="143" width="50" height="8" rx="4" fill="white"/>
+  
+  <!-- Plus icon moved up -->
+  <circle cx="155" cy="45" r="12" fill="url(#grad)"/>
+  <rect x="149" y="43.5" width="12" height="3" rx="1.5" fill="white"/>
+  <rect x="153.5" y="39" width="3" height="12" rx="1.5" fill="white"/>
 </svg>
 ''';
 
@@ -119,28 +132,65 @@ class RegisterScreenState extends State<RegisterScreen>
   }
 
   void _initializeAnimations() {
-    _animationController = AnimationController(
+    // Fade animation
+    _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _animationController,
+      parent: _fadeController,
       curve: Curves.easeInOut,
     ));
 
+    // Slide animation
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.1),
       end: Offset.zero,
     ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
     ));
 
-    _animationController.forward();
+    // Scale animation
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.95,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _scaleController,
+      curve: Curves.elasticOut,
+    ));
+
+    // Rotate animation
+    _rotateController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    // Start animations
+    _fadeController.forward();
+    _slideController.forward();
+    _scaleController.forward();
+  }
+
+  void _animateStepTransition() {
+    _fadeController.reset();
+    _slideController.reset();
+    _scaleController.reset();
+
+    _fadeController.forward();
+    _slideController.forward();
+    _scaleController.forward();
   }
 
   void _initializeFocusNodes() {
@@ -156,20 +206,21 @@ class RegisterScreenState extends State<RegisterScreen>
     });
   }
 
-  // Rate limiting check
+// Enhanced _checkRateLimit method
   bool _checkRateLimit() {
-    if (_failedAttempts >= 3) {
+    if (_failedAttempts >= _maxAttempts) {
       final now = DateTime.now();
       if (_lastAttemptTime != null) {
         final difference = now.difference(_lastAttemptTime!);
-        if (difference.inMinutes < 15) {
+        if (difference.inMinutes < _lockoutMinutes) {
           setState(() {
             error =
-                'Too many attempts. Please try again in ${15 - difference.inMinutes} minutes.';
+                'Too many attempts. Please try again in ${_lockoutMinutes - difference.inMinutes} minutes.';
           });
           return false;
         } else {
           _failedAttempts = 0;
+          _lastAttemptTime = null;
         }
       }
     }
@@ -178,7 +229,10 @@ class RegisterScreenState extends State<RegisterScreen>
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _fadeController.dispose();
+    _slideController.dispose();
+    _scaleController.dispose();
+    _rotateController.dispose();
     for (var node in _focusNodes) {
       node.dispose();
     }
@@ -207,6 +261,21 @@ class RegisterScreenState extends State<RegisterScreen>
 
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
+
+      // Show loading screen with animation
+      Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              FadeTransition(
+            opacity: animation,
+            child: const LoadingScreen(
+              message: "Creating your account...",
+            ),
+          ),
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
 
       try {
         // Basic user data
@@ -263,15 +332,33 @@ class RegisterScreenState extends State<RegisterScreen>
           userData,
         );
 
+        // Pop loading screen
+        Navigator.pop(context);
+
         if (result == null) {
           _handleFailedAttempt();
         } else {
+          // Successful registration animation
+          await _rotateController.forward();
+
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: animation,
+                  child: const HomeScreen(),
+                ),
+              ),
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
           );
         }
       } catch (e) {
+        // Pop loading screen
+        Navigator.pop(context);
         _handleFailedAttempt();
       }
     }
@@ -303,9 +390,8 @@ class RegisterScreenState extends State<RegisterScreen>
                 keyboardType: TextInputType.emailAddress,
                 focusNode: _focusNodes[0],
                 nextFocusNode: _focusNodes[1],
-                validator: null,
+                validator: InputValidators.validateEmail,
               ),
-              const SizedBox(height: 16),
               CustomTextField(
                 controller: _passwordController,
                 label: 'Password',
@@ -313,9 +399,8 @@ class RegisterScreenState extends State<RegisterScreen>
                 isPassword: true,
                 focusNode: _focusNodes[1],
                 nextFocusNode: _focusNodes[2],
-                validator: null,
+                validator: InputValidators.validatePassword,
               ),
-              const SizedBox(height: 16),
               CustomTextField(
                 controller: _confirmPasswordController,
                 label: 'Confirm Password',
@@ -323,7 +408,8 @@ class RegisterScreenState extends State<RegisterScreen>
                 isPassword: true,
                 focusNode: _focusNodes[2],
                 nextFocusNode: _focusNodes[3],
-                validator: null,
+                validator: (value) => InputValidators.validateConfirmPassword(
+                    value, _passwordController.text),
               ),
             ],
           ),
@@ -699,72 +785,174 @@ class RegisterScreenState extends State<RegisterScreen>
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: SvgPicture.string(
-                  onboardingSvg,
-                  width: 120,
-                  height: 120,
+              FadeInDown(
+                duration: const Duration(milliseconds: 800),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: SvgPicture.string(
+                    onboardingSvg,
+                    width: 120,
+                    height: 120,
+                  ),
                 ),
               ),
-              // Inside the Stepper widget in build method
               Expanded(
-                child: Form(
-                  key: _formKey,
-                  child: Theme(
-                    data: Theme.of(context).copyWith(
-                      colorScheme: Theme.of(context).colorScheme.copyWith(
-                            primary: AppColors.primaryGreen,
-                            secondary: AppColors.secondaryOrange,
-                          ),
-                    ),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Stepper(
-                          type: StepperType.horizontal,
-                          currentStep: _currentStep,
-                          onStepContinue: () {
-                            if (_currentStep < buildSteps().length - 1) {
-                              setState(() => _currentStep += 1);
-                            } else {
-                              _handleSubmit();
-                            }
-                          },
-                          onStepCancel: () {
-                            if (_currentStep > 0) {
-                              setState(() => _currentStep -= 1);
-                            }
-                          },
-                          steps: buildSteps(),
-                          elevation: 0,
-                          controlsBuilder: (context, controls) =>
-                              _buildControls(controls),
+                child: FadeInUp(
+                  duration: const Duration(milliseconds: 800),
+                  delay: const Duration(milliseconds: 300),
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: Form(
+                      key: _formKey,
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                                primary: AppColors.primaryGreen,
+                                secondary: AppColors.secondaryOrange,
+                              ),
                         ),
+                        child: _buildStepperContent(),
                       ),
                     ),
                   ),
                 ),
               ),
-              if (error.isNotEmpty) _buildErrorMessage(),
+              if (error.isNotEmpty)
+                FadeIn(
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildErrorMessage(),
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildStepperContent() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stepper(
+          type: StepperType.horizontal,
+          currentStep: _currentStep,
+          onStepContinue: () {
+            if (_currentStep < buildSteps().length - 1) {
+              setState(() {
+                _currentStep += 1;
+                _animateStepTransition();
+              });
+            } else {
+              _handleSubmit();
+            }
+          },
+          onStepCancel: () {
+            if (_currentStep > 0) {
+              setState(() {
+                _currentStep -= 1;
+                _animateStepTransition();
+              });
+            }
+          },
+          steps: buildSteps(),
+          elevation: 0,
+          controlsBuilder: (context, controls) => _buildControls(controls),
+        ),
+      ),
+    );
+  }
+
+  bool _validateCurrentStep() {
+    switch (_currentStep) {
+      case 0:
+        // Validate Account Step
+        return _emailController.text.isNotEmpty &&
+            InputValidators.validateEmail(_emailController.text) == null &&
+            _passwordController.text.isNotEmpty &&
+            InputValidators.validatePassword(_passwordController.text) ==
+                null &&
+            _confirmPasswordController.text.isNotEmpty &&
+            InputValidators.validateConfirmPassword(
+                    _confirmPasswordController.text,
+                    _passwordController.text) ==
+                null;
+
+      case 1:
+        // Validate Details Step
+        return _fullNameController.text.isNotEmpty &&
+            InputValidators.validateFullName(_fullNameController.text) ==
+                null &&
+            _phoneController.text.isNotEmpty &&
+            InputValidators.validatePhone(_phoneController.text) == null &&
+            _idNumberController.text.isNotEmpty &&
+            InputValidators.validateIdNumber(_idNumberController.text) == null;
+
+      case 2:
+        // Validate Additional Info Step based on user type
+        switch (userType) {
+          case 'Landlord':
+            return _kraPinController.text.isNotEmpty &&
+                InputValidators.validateKraPin(_kraPinController.text) ==
+                    null &&
+                _physicalAddressController.text.isNotEmpty &&
+                InputValidators.validateAddress(
+                        _physicalAddressController.text) ==
+                    null;
+
+          case 'Tenant':
+            return _currentAddressController.text.isNotEmpty &&
+                InputValidators.validateAddress(
+                        _currentAddressController.text) ==
+                    null &&
+                _emergencyContactController.text.isNotEmpty &&
+                _emergencyPhoneController.text.isNotEmpty &&
+                InputValidators.validatePhone(_emergencyPhoneController.text) ==
+                    null;
+
+          case 'Agent':
+            return _companyNameController.text.isNotEmpty &&
+                InputValidators.validateCompanyName(
+                        _companyNameController.text) ==
+                    null &&
+                _licenseNumberController.text.isNotEmpty &&
+                InputValidators.validateLicenseNumber(
+                        _licenseNumberController.text) ==
+                    null &&
+                _businessAddressController.text.isNotEmpty &&
+                InputValidators.validateAddress(
+                        _businessAddressController.text) ==
+                    null;
+
+          case 'Admin':
+            return _adminAccessCodeController.text.isNotEmpty &&
+                InputValidators.validateAdminCode(
+                        _adminAccessCodeController.text) ==
+                    null &&
+                _departmentController.text.isNotEmpty &&
+                _employeeIdController.text.isNotEmpty &&
+                InputValidators.validateEmployeeId(
+                        _employeeIdController.text) ==
+                    null;
+
+          default:
+            return false;
+        }
+
+      default:
+        return false;
+    }
   }
 
   Widget _buildControls(ControlsDetails controls) {
@@ -775,7 +963,18 @@ class RegisterScreenState extends State<RegisterScreen>
         children: [
           Expanded(
             child: ElevatedButton(
-              onPressed: _isLoading ? null : controls.onStepContinue,
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      if (_validateCurrentStep()) {
+                        controls.onStepContinue?.call();
+                      } else {
+                        setState(() {
+                          error =
+                              'Please fill in all required fields correctly';
+                        });
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -855,24 +1054,5 @@ class RegisterScreenState extends State<RegisterScreen>
         ),
       ),
     );
-  }
-}
-
-// Add input validators
-class InputValidators {
-  static String? validateKraPin(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'KRA PIN is required';
-    }
-    // Add additional KRA PIN validation logic here
-    return null;
-  }
-
-  static String? validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Phone number is required';
-    }
-    // Add additional phone number validation logic here
-    return null;
   }
 }

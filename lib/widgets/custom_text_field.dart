@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class CustomTextField extends StatelessWidget {
+class CustomTextField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final IconData prefixIcon;
@@ -8,6 +8,8 @@ class CustomTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final FocusNode? focusNode;
   final FocusNode? nextFocusNode;
+  final String? Function(String?)? validator;
+  final int maxLength;
 
   const CustomTextField({
     super.key,
@@ -17,19 +19,72 @@ class CustomTextField extends StatelessWidget {
     this.isPassword = false,
     this.keyboardType,
     this.focusNode,
-    this.nextFocusNode, required validator,
+    this.nextFocusNode,
+    this.validator,
+    this.maxLength = 100,
   });
+
+  @override
+  State<CustomTextField> createState() => _CustomTextFieldState();
+}
+
+class _CustomTextFieldState extends State<CustomTextField> {
+  bool _obscureText = true;
+  bool _isFocused = false;
+  final _formFieldKey = GlobalKey<FormFieldState>();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode?.addListener(_handleFocusChange);
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode?.removeListener(_handleFocusChange);
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (mounted) {
+      setState(() {
+        _isFocused = widget.focusNode?.hasFocus ?? false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      controller: controller,
-      focusNode: focusNode,
-      obscureText: isPassword,
-      keyboardType: keyboardType,
+      key: _formFieldKey,
+      controller: widget.controller,
+      focusNode: widget.focusNode,
+      obscureText: widget.isPassword ? _obscureText : false,
+      keyboardType: widget.keyboardType,
+      maxLength: widget.maxLength,
+      onChanged: (value) {
+        if (_formFieldKey.currentState != null) {
+          _formFieldKey.currentState!.validate();
+        }
+      },
       decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(prefixIcon),
+        labelText: widget.label,
+        prefixIcon: Icon(widget.prefixIcon),
+        suffixIcon: widget.isPassword
+            ? IconButton(
+                icon: Icon(
+                  _obscureText ? Icons.visibility : Icons.visibility_off,
+                  color: _isFocused
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscureText = !_obscureText;
+                  });
+                },
+              )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
@@ -48,21 +103,29 @@ class CustomTextField extends StatelessWidget {
             color: Theme.of(context).colorScheme.primary,
           ),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.error,
+          ),
+        ),
         filled: true,
         fillColor: Theme.of(context).cardColor,
+        counterText: '', // Hide character counter
       ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return '$label is required';
-        }
-        if (isPassword && value.length < 6) {
-          return 'Password must be at least 6 characters';
-        }
-        return null;
-      },
+      validator: widget.validator ??
+          (value) {
+            if (value == null || value.isEmpty) {
+              return '${widget.label} is required';
+            }
+            if (widget.isPassword && value.length < 8) {
+              return 'Password must be at least 8 characters';
+            }
+            return null;
+          },
       onFieldSubmitted: (_) {
-        if (nextFocusNode != null) {
-          FocusScope.of(context).requestFocus(nextFocusNode);
+        if (widget.nextFocusNode != null) {
+          FocusScope.of(context).requestFocus(widget.nextFocusNode);
         }
       },
     );
