@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:rental_tax_port/models/property.dart';
 import 'package:rental_tax_port/screens/agent/manage_properties_screen.dart';
+import 'package:rental_tax_port/services/auth_service.dart';
 import 'package:rental_tax_port/services/database_service.dart';
+import 'package:rental_tax_port/theme.dart';
+import 'package:rental_tax_port/widgets/custom_app_bar.dart';
+import 'package:rental_tax_port/widgets/custom_sidebar.dart';
 import 'package:rental_tax_port/widgets/property_card.dart';
 
 class AgentDashboard extends StatefulWidget {
@@ -17,36 +21,39 @@ class AgentDashboardState extends State<AgentDashboard> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Agent Dashboard'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.home), text: 'Managed Properties'),
-              Tab(icon: Icon(Icons.assignment), text: 'Tasks'),
-            ],
+        length: 2,
+        child: Scaffold(
+          appBar: const CustomAppBar(
+            title: 'Agent Dashboard',
+            showMenu: true,
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildManagedPropertiesTab(),
-            _buildTasksTab(),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => const ManagePropertiesScreen()),
-            );
-          },
-          tooltip: 'Manage Properties',
-          child: const Icon(Icons.add),
-        ),
-      ),
-    );
+          endDrawer: CustomSidebar(
+            authService: AuthService(),
+          ),
+          body: SingleChildScrollView(
+            child: Container(
+              color: AppColors.backgroundWhite,
+              child: Column(
+                children: [
+                  _buildManagedPropertiesTab(),
+                  _buildTasksTab(),
+                ],
+              ),
+            ),
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ManagePropertiesScreen(),
+                ),
+              );
+            },
+            tooltip: 'Manage Properties',
+            child: const Icon(Icons.add),
+          ),
+        ));
   }
 
   Widget _buildManagedPropertiesTab() {

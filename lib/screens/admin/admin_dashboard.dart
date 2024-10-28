@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:rental_tax_port/screens/admin/fraud_detection_screen.dart';
 import 'package:rental_tax_port/screens/admin/tax_collection_report_screen.dart';
 import 'package:rental_tax_port/screens/admin/vacancy_inspection_screen.dart';
+import 'package:rental_tax_port/services/auth_service.dart';
+import 'package:rental_tax_port/theme.dart';
+import 'package:rental_tax_port/widgets/custom_app_bar.dart';
+import 'package:rental_tax_port/widgets/custom_sidebar.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -9,27 +13,28 @@ class AdminDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Admin Dashboard'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.security), text: 'Fraud Detection'),
-              Tab(icon: Icon(Icons.home_work), text: 'Vacancy Inspection'),
-              Tab(icon: Icon(Icons.monetization_on), text: 'Tax Collection'),
-            ],
+        length: 3,
+        child: Scaffold(
+          appBar: const CustomAppBar(
+            title: 'Agent Dashboard',
+            showMenu: true,
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildFraudDetectionTab(context),
-            _buildVacancyInspectionTab(context),
-            _buildTaxCollectionTab(context),
-          ],
-        ),
-      ),
-    );
+          endDrawer: CustomSidebar(
+            authService: AuthService(),
+          ),
+          body: SingleChildScrollView(
+            child: Container(
+              color: AppColors.backgroundWhite,
+              child: Column(
+                children: [
+                  _buildFraudDetectionTab(context),
+                  _buildVacancyInspectionTab(context),
+                  _buildTaxCollectionTab(context),
+                ],
+              ),
+            ),
+          ),
+        ));
   }
 
   Widget _buildFraudDetectionTab(BuildContext context) {
@@ -38,7 +43,8 @@ class AdminDashboard extends StatelessWidget {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const FraudDetectionScreen()),
+            MaterialPageRoute(
+                builder: (context) => const FraudDetectionScreen()),
           );
         },
         child: const Text('Go to Fraud Detection'),
@@ -52,7 +58,8 @@ class AdminDashboard extends StatelessWidget {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const VacancyInspectionScreen()),
+            MaterialPageRoute(
+                builder: (context) => const VacancyInspectionScreen()),
           );
         },
         child: const Text('Go to Vacancy Inspection'),
@@ -66,7 +73,8 @@ class AdminDashboard extends StatelessWidget {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const TaxCollectionReportScreen()),
+            MaterialPageRoute(
+                builder: (context) => const TaxCollectionReportScreen()),
           );
         },
         child: const Text('View Tax Collection Report'),

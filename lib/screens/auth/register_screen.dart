@@ -56,7 +56,7 @@ class RegisterScreenState extends State<RegisterScreen>
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
-      TextEditingController();
+  TextEditingController();
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _idNumberController = TextEditingController();
@@ -64,28 +64,28 @@ class RegisterScreenState extends State<RegisterScreen>
   // Landlord Specific Fields
   final TextEditingController _kraPinController = TextEditingController();
   final TextEditingController _physicalAddressController =
-      TextEditingController(); // Added missing controller
+  TextEditingController(); // Added missing controller
 
   // Property Fields (for Landlords)
 
   // Tenant Fields
   final TextEditingController _emergencyContactController =
-      TextEditingController();
+  TextEditingController();
   final TextEditingController _emergencyPhoneController =
-      TextEditingController();
+  TextEditingController();
   final TextEditingController _currentAddressController =
-      TextEditingController();
+  TextEditingController();
 
   // Agent Fields
   final TextEditingController _companyNameController = TextEditingController();
   final TextEditingController _licenseNumberController =
-      TextEditingController();
+  TextEditingController();
   final TextEditingController _businessAddressController =
-      TextEditingController();
+  TextEditingController();
 
   // Admin Fields
   final TextEditingController _adminAccessCodeController =
-      TextEditingController();
+  TextEditingController();
   final TextEditingController _departmentController = TextEditingController();
   final TextEditingController _employeeIdController = TextEditingController();
 
@@ -221,7 +221,7 @@ class RegisterScreenState extends State<RegisterScreen>
         if (difference.inMinutes < _lockoutMinutes) {
           setState(() {
             error =
-                'Too many attempts. Please try again in ${_lockoutMinutes - difference.inMinutes} minutes.';
+            'Too many attempts. Please try again in ${_lockoutMinutes - difference.inMinutes} minutes.';
           });
           return false;
         } else {
@@ -274,11 +274,11 @@ class RegisterScreenState extends State<RegisterScreen>
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
               FadeTransition(
-            opacity: animation,
-            child: const LoadingScreen(
-              message: "Creating your account",
-            ),
-          ),
+                opacity: animation,
+                child: const LoadingScreen(
+                  message: "Creating your account",
+                ),
+              ),
           transitionDuration: const Duration(milliseconds: 500),
         ),
       );
@@ -321,7 +321,7 @@ class RegisterScreenState extends State<RegisterScreen>
             });
             break;
           case 'Admin':
-            // Verify admin access code before proceeding
+          // Verify admin access code before proceeding
             if (!await _auth.verifyAdminCode(_adminAccessCodeController.text)) {
               throw Exception('Invalid admin access code');
             }
@@ -352,12 +352,12 @@ class RegisterScreenState extends State<RegisterScreen>
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
                   FadeTransition(
-                opacity: animation,
-                child: ScaleTransition(
-                  scale: animation,
-                  child: const HomeScreen(),
-                ),
-              ),
+                    opacity: animation,
+                    child: ScaleTransition(
+                      scale: animation,
+                      child: const HomeScreen(),
+                    ),
+                  ),
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
@@ -458,11 +458,11 @@ class RegisterScreenState extends State<RegisterScreen>
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
               FadeTransition(
-            opacity: animation,
-            child: const LoadingScreen(
-              message: "Signing in with Google",
-            ),
-          ),
+                opacity: animation,
+                child: const LoadingScreen(
+                  message: "Signing in with Google",
+                ),
+              ),
           transitionDuration: const Duration(milliseconds: 500),
         ),
       );
@@ -587,12 +587,12 @@ class RegisterScreenState extends State<RegisterScreen>
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
                 FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(
-                scale: animation,
-                child: destinationScreen,
-              ),
-            ),
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: animation,
+                    child: destinationScreen,
+                  ),
+                ),
             transitionDuration: const Duration(milliseconds: 800),
           ),
         );
@@ -806,8 +806,8 @@ class RegisterScreenState extends State<RegisterScreen>
                 Text(
                   description,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                    color: Colors.grey[600],
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -1007,9 +1007,9 @@ class RegisterScreenState extends State<RegisterScreen>
         label: Text(
           'Continue with Google',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: AppColors.textDark,
-                fontWeight: FontWeight.w500,
-              ),
+            color: AppColors.textDark,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         onPressed: _isLoading ? null : _handleGoogleSignIn,
         style: ElevatedButton.styleFrom(
@@ -1087,9 +1087,9 @@ class RegisterScreenState extends State<RegisterScreen>
                       child: Theme(
                         data: Theme.of(context).copyWith(
                           colorScheme: Theme.of(context).colorScheme.copyWith(
-                                primary: AppColors.primaryGreen,
-                                secondary: AppColors.secondaryOrange,
-                              ),
+                            primary: AppColors.primaryGreen,
+                            secondary: AppColors.secondaryOrange,
+                          ),
                         ),
                         child: _buildStepperContent(),
                       ),
@@ -1158,7 +1158,7 @@ class RegisterScreenState extends State<RegisterScreen>
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 0:
-        // Validate Account Step
+      // Validate Account Step
         return _emailController.text.isNotEmpty &&
             InputValidators.validateEmail(_emailController.text) == null &&
             _passwordController.text.isNotEmpty &&
@@ -1166,12 +1166,12 @@ class RegisterScreenState extends State<RegisterScreen>
                 null &&
             _confirmPasswordController.text.isNotEmpty &&
             InputValidators.validateConfirmPassword(
-                    _confirmPasswordController.text,
-                    _passwordController.text) ==
+                _confirmPasswordController.text,
+                _passwordController.text) ==
                 null;
 
       case 1:
-        // Validate Details Step
+      // Validate Details Step
         return _fullNameController.text.isNotEmpty &&
             InputValidators.validateFullName(_fullNameController.text) ==
                 null &&
@@ -1181,7 +1181,7 @@ class RegisterScreenState extends State<RegisterScreen>
             InputValidators.validateIdNumber(_idNumberController.text) == null;
 
       case 2:
-        // Validate Additional Info Step based on user type
+      // Validate Additional Info Step based on user type
         switch (userType) {
           case 'Landlord':
             return _kraPinController.text.isNotEmpty &&
@@ -1189,13 +1189,13 @@ class RegisterScreenState extends State<RegisterScreen>
                     null &&
                 _physicalAddressController.text.isNotEmpty &&
                 InputValidators.validateAddress(
-                        _physicalAddressController.text) ==
+                    _physicalAddressController.text) ==
                     null;
 
           case 'Tenant':
             return _currentAddressController.text.isNotEmpty &&
                 InputValidators.validateAddress(
-                        _currentAddressController.text) ==
+                    _currentAddressController.text) ==
                     null &&
                 _emergencyContactController.text.isNotEmpty &&
                 _emergencyPhoneController.text.isNotEmpty &&
@@ -1205,26 +1205,26 @@ class RegisterScreenState extends State<RegisterScreen>
           case 'Agent':
             return _companyNameController.text.isNotEmpty &&
                 InputValidators.validateCompanyName(
-                        _companyNameController.text) ==
+                    _companyNameController.text) ==
                     null &&
                 _licenseNumberController.text.isNotEmpty &&
                 InputValidators.validateLicenseNumber(
-                        _licenseNumberController.text) ==
+                    _licenseNumberController.text) ==
                     null &&
                 _businessAddressController.text.isNotEmpty &&
                 InputValidators.validateAddress(
-                        _businessAddressController.text) ==
+                    _businessAddressController.text) ==
                     null;
 
           case 'Admin':
             return _adminAccessCodeController.text.isNotEmpty &&
                 InputValidators.validateAdminCode(
-                        _adminAccessCodeController.text) ==
+                    _adminAccessCodeController.text) ==
                     null &&
                 _departmentController.text.isNotEmpty &&
                 _employeeIdController.text.isNotEmpty &&
                 InputValidators.validateEmployeeId(
-                        _employeeIdController.text) ==
+                    _employeeIdController.text) ==
                     null;
 
           default:
@@ -1247,15 +1247,15 @@ class RegisterScreenState extends State<RegisterScreen>
               onPressed: _isLoading
                   ? null
                   : () {
-                      if (_validateCurrentStep()) {
-                        controls.onStepContinue?.call();
-                      } else {
-                        setState(() {
-                          error =
-                              'Please fill in all required fields correctly';
-                        });
-                      }
-                    },
+                if (_validateCurrentStep()) {
+                  controls.onStepContinue?.call();
+                } else {
+                  setState(() {
+                    error =
+                    'Please fill in all required fields correctly';
+                  });
+                }
+              },
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -1264,18 +1264,18 @@ class RegisterScreenState extends State<RegisterScreen>
               ),
               child: _isLoading
                   ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
                   : Text(
-                      _currentStep == buildSteps().length - 1
-                          ? 'Create Account'
-                          : 'Continue',
-                    ),
+                _currentStep == buildSteps().length - 1
+                    ? 'Create Account'
+                    : 'Continue',
+              ),
             ),
           ),
           if (_currentStep > 0) ...[

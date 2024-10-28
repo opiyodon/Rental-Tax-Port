@@ -42,13 +42,51 @@ class AuthService {
   }
 
   // Sign in existing user
-  Future<User?> signIn(String email, String password) async {
+  Future<User?> signIn(
+      String email, String password, String expectedUserType) async {
     try {
+      // First authenticate with Firebase
       UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      return result.user;
+      User? user = result.user;
+
+      if (user != null) {
+        // Get user data from Firestore to verify user type
+        DocumentSnapshot userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
+
+        if (!userDoc.exists) {
+          await _auth.signOut();
+          throw Exception('User data not found');
+        }
+
+        String userType = userDoc.get('userType') as String;
+
+        // Verify user type matches
+        if (userType != expectedUserType) {
+          await _auth.signOut();
+          throw Exception('Invalid user type');
+        }
+
+        // For admin users, verify admin status
+        if (userType == 'Admin') {
+          bool isAdminVerified = userDoc.get('adminVerified') as bool? ?? false;
+          if (!isAdminVerified) {
+            await _auth.signOut();
+            throw Exception('Admin verification failed');
+          }
+        }
+
+        // Update last login timestamp
+        await _firestore.collection('users').doc(user.uid).update({
+          'lastLogin': DateTime.now().toIso8601String(),
+        });
+
+        return user;
+      }
+      return null;
     } catch (e) {
       print('Error during sign in: ${e.toString()}');
       rethrow;
@@ -66,7 +104,8 @@ class AuthService {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return null;
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -78,7 +117,8 @@ class AuthService {
 
       if (user != null) {
         // Check if user exists in Firestore
-        DocumentSnapshot doc = await _firestore.collection('users').doc(user.uid).get();
+        DocumentSnapshot doc =
+            await _firestore.collection('users').doc(user.uid).get();
 
         if (!doc.exists) {
           // Create admin user data
@@ -93,16 +133,17 @@ class AuthService {
             'isVerified': user.emailVerified,
             'department': '',
             'employeeId': '',
-            'isAdmin': true,  // Add this flag for admin users
-            'adminVerified': true,  // Add this to indicate admin verification
+            'isAdmin': true, // Add this flag for admin users
+            'adminVerified': true, // Add this to indicate admin verification
           };
 
           // Create new admin user document
           await _firestore.collection('users').doc(user.uid).set(userData);
         } else {
           // Verify existing user is actually an admin
-          if (doc.get('userType') != 'Admin' || doc.get('adminVerified') != true) {
-            await _auth.signOut();  // Sign out if not a verified admin
+          if (doc.get('userType') != 'Admin' ||
+              doc.get('adminVerified') != true) {
+            await _auth.signOut(); // Sign out if not a verified admin
             throw Exception('User is not authorized as admin');
           }
 
@@ -131,7 +172,8 @@ class AuthService {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return null;
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -143,7 +185,8 @@ class AuthService {
 
       if (user != null) {
         // Check if user exists in Firestore
-        DocumentSnapshot doc = await _firestore.collection('users').doc(user.uid).get();
+        DocumentSnapshot doc =
+            await _firestore.collection('users').doc(user.uid).get();
 
         if (!doc.exists) {
           // Create basic user data from Google account
@@ -182,10 +225,8 @@ class AuthService {
     try {
       // In production, this should verify against a secure backend
       // You might want to check against Firebase Remote Config or a secure API
-      DocumentSnapshot adminConfig = await _firestore
-          .collection('config')
-          .doc('admin_settings')
-          .get();
+      DocumentSnapshot adminConfig =
+          await _firestore.collection('config').doc('admin_settings').get();
 
       if (!adminConfig.exists) {
         return false;
@@ -306,7 +347,8 @@ class AuthService {
   }
 
   // Update user profile
-  Future<void> updateUserProfile(Map<String, dynamic> userData, Map<String, dynamic> additionalData) async {
+  Future<void> updateUserProfile(Map<String, dynamic> userData,
+      Map<String, dynamic> additionalData) async {
     try {
       User? currentUser = _auth.currentUser;
       if (currentUser != null) {
