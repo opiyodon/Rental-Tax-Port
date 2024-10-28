@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:animate_do/animate_do.dart';
@@ -50,7 +49,6 @@ class LoginScreenState extends State<LoginScreen>
 
   // Animations
   late Animation<double> _scaleAnimation;
-  late Animation<double> _rotateAnimation;
 
   final String onboardingSvg = '''
 <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
@@ -107,13 +105,6 @@ class LoginScreenState extends State<LoginScreen>
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    _rotateAnimation = Tween<double>(
-      begin: 0,
-      end: 2 * pi,
-    ).animate(CurvedAnimation(
-      parent: _rotateController,
-      curve: Curves.easeInOutCirc,
-    ));
 
     // Slide animation
     _slideController = AnimationController(
@@ -201,35 +192,25 @@ class LoginScreenState extends State<LoginScreen>
       setState(() => _isLoading = true);
 
       try {
-        // Show loading screen with combined animations
+        // Show loading screen
         Navigator.push(
           context,
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
                 FadeTransition(
               opacity: animation,
-              child: AnimatedBuilder(
-                animation: _rotateAnimation,
-                builder: (context, child) => Transform.rotate(
-                  angle: _rotateAnimation.value,
-                  child: child,
-                ),
-                child: const LoadingScreen(
-                  message: "Signing in to your account",
-                ),
+              child: const LoadingScreen(
+                message: "Signing in to your account",
               ),
             ),
             transitionDuration: const Duration(milliseconds: 500),
           ),
         );
 
-        // Start rotation animation
-        _rotateController.repeat();
-
-        // Remove type casting from signIn result
         User? user = await _auth.signIn(
           _emailController.text,
           _passwordController.text,
+          userType, // Pass the selected user type
         );
 
         if (user != null) {
@@ -239,42 +220,14 @@ class LoginScreenState extends State<LoginScreen>
               .doc(user.uid)
               .get();
 
-          // Update last login
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .update({
-            'lastLogin': DateTime.now().toIso8601String(),
-          });
-
           String userType = userDoc.get('userType') as String;
-          bool isAdminVerified = userType == 'Admin'
-              ? (userDoc.get('adminVerified') as bool? ?? false)
-              : true;
-
-          // Verify admin status
-          if (userType == 'Admin' && !isAdminVerified) {
-            // Stop rotation animation
-            _rotateController.stop();
-            await FirebaseAuth.instance.signOut();
-            setState(() {
-              error = 'Admin verification failed';
-              _isLoading = false;
-            });
-            Navigator.pop(context); // Pop loading screen
-            return;
-          }
-
-          // Stop rotation animation
-          await _rotateController.forward();
 
           // Pop loading screen
           Navigator.pop(context);
 
-          // Get the destination screen based on user type
+          // Navigate to appropriate dashboard
           Widget destinationScreen = _getDestinationScreen(userType);
 
-          // Navigate with combined animations
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
@@ -283,23 +236,14 @@ class LoginScreenState extends State<LoginScreen>
                 opacity: animation,
                 child: ScaleTransition(
                   scale: animation,
-                  child: AnimatedBuilder(
-                    animation: _rotateAnimation,
-                    builder: (context, child) => Transform.rotate(
-                      angle: _rotateAnimation.value,
-                      child: child,
-                    ),
-                    child: destinationScreen,
-                  ),
+                  child: destinationScreen,
                 ),
               ),
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
         } else {
-          // Stop rotation animation
-          _rotateController.stop();
-          Navigator.pop(context); // Pop loading screen
+          Navigator.pop(context);
           setState(() {
             error = 'Invalid email or password';
             _isLoading = false;
@@ -307,11 +251,23 @@ class LoginScreenState extends State<LoginScreen>
           _handleFailedAttempt();
         }
       } catch (e) {
-        // Stop rotation animation
-        _rotateController.stop();
-        Navigator.pop(context); // Pop loading screen
+        Navigator.pop(context);
+        String errorMessage = 'Invalid email or password';
+
+        if (e.toString().contains('user-not-found')) {
+          errorMessage = 'No user found with this email';
+        } else if (e.toString().contains('wrong-password')) {
+          errorMessage = 'Invalid password';
+        } else if (e.toString().contains('Invalid user type')) {
+          errorMessage = 'Selected user type does not match account type';
+        } else if (e.toString().contains('Admin verification failed')) {
+          errorMessage = 'Admin verification failed';
+        } else if (e.toString().contains('User data not found')) {
+          errorMessage = 'User account not found';
+        }
+
         setState(() {
-          error = 'Invalid email or password';
+          error = errorMessage;
           _isLoading = false;
         });
         _handleFailedAttempt();
@@ -320,6 +276,10 @@ class LoginScreenState extends State<LoginScreen>
   }
 
   void _handleGoogleSignIn() async {
+    final selectedUserType = await _showUserTypeDialog();
+
+    if (selectedUserType == null) return;
+
     if (!_checkRateLimit()) return;
 
     setState(() {
@@ -328,49 +288,29 @@ class LoginScreenState extends State<LoginScreen>
     });
 
     try {
-      // Show loading screen with combined animations
       Navigator.push(
         context,
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
               FadeTransition(
             opacity: animation,
-            child: AnimatedBuilder(
-              animation: _rotateAnimation,
-              builder: (context, child) => Transform.rotate(
-                angle: _rotateAnimation.value,
-                child: child,
-              ),
-              child: const LoadingScreen(
-                message: "Signing in with Google",
-              ),
+            child: const LoadingScreen(
+              message: "Signing in with Google",
             ),
           ),
           transitionDuration: const Duration(milliseconds: 500),
         ),
       );
 
-      // Start rotation animation
-      _rotateController.repeat();
-
-      // First show the user type selection dialog
-      final selectedUserType = await _showUserTypeDialog();
-
-      if (selectedUserType == null) {
-        _rotateController.stop();
-        Navigator.pop(context);
-        setState(() => _isLoading = false);
-        return;
-      }
-
       UserCredential? userCredential;
 
       if (selectedUserType == 'Admin') {
         final adminCode = await _showAdminCodeDialog();
         if (adminCode == null) {
-          _rotateController.stop();
           Navigator.pop(context);
-          setState(() => _isLoading = false);
+          setState(() {
+            _isLoading = false;
+          });
           return;
         }
 
@@ -382,30 +322,89 @@ class LoginScreenState extends State<LoginScreen>
       if (userCredential?.user != null) {
         final user = userCredential!.user!;
 
-        // Get user data from Firestore
+        // Check if user exists in Firestore
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .get();
 
+        // Handle new user registration
+        if (!userDoc.exists) {
+          // Create new user data
+          Map<String, dynamic> userData = {
+            'email': user.email ?? '',
+            'fullName': user.displayName ?? '',
+            'phoneNumber': user.phoneNumber ?? '',
+            'userType': selectedUserType,
+            'registrationDate': DateTime.now().toIso8601String(),
+            'lastLogin': DateTime.now().toIso8601String(),
+            'isVerified': user.emailVerified,
+          };
+
+          // Add role-specific fields
+          switch (selectedUserType) {
+            case 'Landlord':
+              userData.addAll({
+                'kraPin': '',
+                'physicalAddress': '',
+                'isNonResident': false,
+              });
+              break;
+            case 'Tenant':
+              userData.addAll({
+                'currentAddress': '',
+                'emergencyContact': {
+                  'name': '',
+                  'phone': '',
+                },
+              });
+              break;
+            case 'Agent':
+              userData.addAll({
+                'companyName': '',
+                'licenseNumber': '',
+                'businessAddress': '',
+              });
+              break;
+            case 'Admin':
+              userData.addAll({
+                'department': '',
+                'employeeId': '',
+                'adminVerified': true,
+              });
+              break;
+          }
+
+          // Save new user data
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set(userData);
+
+          // Update userDoc with the new data
+          userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+        } else {
+          // For existing users, update last login
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
+            'lastLogin': DateTime.now().toIso8601String(),
+          });
+        }
+
+        // Get user type from Firestore document
         String userType = userDoc.get('userType') as String;
         bool isAdminVerified = userType == 'Admin'
             ? (userDoc.get('adminVerified') as bool? ?? false)
             : true;
 
-        // Update last login
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({
-          'lastLogin': DateTime.now().toIso8601String(),
-        });
-
         // Verify admin status
         if (userType == 'Admin' && !isAdminVerified) {
-          _rotateController.stop();
           await _auth.signOut();
-          Navigator.pop(context);
           setState(() {
             error = 'Admin verification failed';
             _isLoading = false;
@@ -413,15 +412,11 @@ class LoginScreenState extends State<LoginScreen>
           return;
         }
 
-        // Stop rotation animation
-        await _rotateController.forward();
-
         Navigator.pop(context); // Pop loading screen
 
-        // Get the destination screen based on user type
+        // Navigate to appropriate dashboard
         Widget destinationScreen = _getDestinationScreen(userType);
 
-        // Navigate with combined animations
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
@@ -430,21 +425,13 @@ class LoginScreenState extends State<LoginScreen>
               opacity: animation,
               child: ScaleTransition(
                 scale: animation,
-                child: AnimatedBuilder(
-                  animation: _rotateAnimation,
-                  builder: (context, child) => Transform.rotate(
-                    angle: _rotateAnimation.value,
-                    child: child,
-                  ),
-                  child: destinationScreen,
-                ),
+                child: destinationScreen,
               ),
             ),
             transitionDuration: const Duration(milliseconds: 800),
           ),
         );
       } else {
-        _rotateController.stop();
         Navigator.pop(context);
         setState(() {
           error = 'Failed to sign in with Google';
@@ -453,7 +440,6 @@ class LoginScreenState extends State<LoginScreen>
         _handleFailedAttempt();
       }
     } catch (e) {
-      _rotateController.stop();
       Navigator.pop(context);
       setState(() {
         error = 'Error during sign in: ${e.toString()}';

@@ -3,7 +3,10 @@ import 'package:rental_tax_port/models/property.dart';
 import 'package:rental_tax_port/screens/landlord/add_property_screen.dart';
 import 'package:rental_tax_port/screens/landlord/manage_tenants_screen.dart';
 import 'package:rental_tax_port/screens/landlord/vacancy_report_screen.dart';
+import 'package:rental_tax_port/services/auth_service.dart';
 import 'package:rental_tax_port/services/database_service.dart';
+import 'package:rental_tax_port/widgets/custom_app_bar.dart';
+import 'package:rental_tax_port/widgets/custom_sidebar.dart';
 import 'package:rental_tax_port/widgets/property_card.dart';
 
 class LandlordDashboard extends StatefulWidget {
@@ -21,15 +24,12 @@ class LandlordDashboardState extends State<LandlordDashboard> {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Landlord Dashboard'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.home), text: 'Properties'),
-              Tab(icon: Icon(Icons.people), text: 'Tenants'),
-              Tab(icon: Icon(Icons.report), text: 'Vacancies'),
-            ],
-          ),
+        appBar: const CustomAppBar(
+          title: 'Landlord Dashboard',
+          showMenu: true,
+        ),
+        endDrawer: CustomSidebar(
+          authService: AuthService(),
         ),
         body: TabBarView(
           children: [
@@ -42,7 +42,8 @@ class LandlordDashboardState extends State<LandlordDashboard> {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const AddPropertyScreen()),
+              MaterialPageRoute(
+                  builder: (context) => const AddPropertyScreen()),
             );
           },
           tooltip: 'Add Property',
@@ -54,7 +55,8 @@ class LandlordDashboardState extends State<LandlordDashboard> {
 
   Widget _buildPropertiesTab() {
     return StreamBuilder<List<Property>>(
-      stream: _databaseService.getProperties('currentLandlordId'), // Replace with actual landlord ID
+      stream: _databaseService.getProperties(
+          'currentLandlordId'), // Replace with actual landlord ID
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const Center(child: Text('Something went wrong'));
@@ -85,7 +87,8 @@ class LandlordDashboardState extends State<LandlordDashboard> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const ManageTenantsScreen()),
+            MaterialPageRoute(
+                builder: (context) => const ManageTenantsScreen()),
           );
         },
         child: const Text('Manage Tenants'),
@@ -99,7 +102,8 @@ class LandlordDashboardState extends State<LandlordDashboard> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const VacancyReportScreen()),
+            MaterialPageRoute(
+                builder: (context) => const VacancyReportScreen()),
           );
         },
         child: const Text('View Vacancy Reports'),
