@@ -1,10 +1,10 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:rental_tax_port/screens/admin/admin_dashboard.dart';
 import 'package:rental_tax_port/screens/agent/agent_dashboard.dart';
-import 'package:rental_tax_port/screens/home/home_screen.dart';
 import 'package:rental_tax_port/screens/landlord/landlord_dashboard.dart';
 import 'package:rental_tax_port/screens/tenant/tenant_dashboard.dart';
 import 'package:rental_tax_port/services/auth_service.dart';
@@ -24,7 +24,6 @@ class RegisterScreen extends StatefulWidget {
 
 class RegisterScreenState extends State<RegisterScreen>
     with TickerProviderStateMixin {
-  // Changed from SingleTickerProviderStateMixin
   final AuthService _auth = AuthService();
   final _formKey = GlobalKey<FormState>();
   final List<FocusNode> _focusNodes = [];
@@ -39,6 +38,7 @@ class RegisterScreenState extends State<RegisterScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _scaleAnimation;
+  late Animation<double> _rotateAnimation;
 
   String userType = 'Tenant';
   String error = '';
@@ -65,8 +65,6 @@ class RegisterScreenState extends State<RegisterScreen>
   final TextEditingController _kraPinController = TextEditingController();
   final TextEditingController _physicalAddressController =
       TextEditingController(); // Added missing controller
-
-  // Property Fields (for Landlords)
 
   // Tenant Fields
   final TextEditingController _emergencyContactController =
@@ -149,6 +147,19 @@ class RegisterScreenState extends State<RegisterScreen>
     ).animate(CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeInOut,
+    ));
+
+    // Rotate animation
+    _rotateController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _rotateAnimation = Tween<double>(
+      begin: 0,
+      end: 2 * pi,
+    ).animate(CurvedAnimation(
+      parent: _rotateController,
+      curve: Curves.easeInOutCirc,
     ));
 
     // Slide animation
@@ -268,20 +279,30 @@ class RegisterScreenState extends State<RegisterScreen>
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // Show loading screen with animation
+      // Show loading screen with combined animations
       Navigator.push(
         context,
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
               FadeTransition(
             opacity: animation,
-            child: const LoadingScreen(
-              message: "Creating your account",
+            child: AnimatedBuilder(
+              animation: _rotateAnimation,
+              builder: (context, child) => Transform.rotate(
+                angle: _rotateAnimation.value,
+                child: child,
+              ),
+              child: const LoadingScreen(
+                message: "Creating your account",
+              ),
             ),
           ),
           transitionDuration: const Duration(milliseconds: 500),
         ),
       );
+
+      // Start rotation animation
+      _rotateController.repeat();
 
       try {
         // Basic user data
@@ -292,6 +313,7 @@ class RegisterScreenState extends State<RegisterScreen>
           'idNumber': _idNumberController.text,
           'userType': userType,
           'registrationDate': DateTime.now().toIso8601String(),
+          'lastLogin': DateTime.now().toIso8601String(),
           'isVerified': false,
         };
 
@@ -328,25 +350,28 @@ class RegisterScreenState extends State<RegisterScreen>
             userData.addAll({
               'department': _departmentController.text,
               'employeeId': _employeeIdController.text,
+              'adminVerified': true,
             });
             break;
         }
 
-        dynamic result = await _auth.signUp(
+        UserCredential? result = (await _auth.signUp(
           _emailController.text,
           _passwordController.text,
           userData,
-        );
+        )) as UserCredential?;
 
-        // Pop loading screen
-        Navigator.pop(context);
-
-        if (result == null) {
-          _handleFailedAttempt();
-        } else {
-          // Successful registration animation
+        if (result?.user != null) {
+          // Stop rotation animation
           await _rotateController.forward();
 
+          // Pop loading screen
+          Navigator.pop(context);
+
+          // Get the destination screen based on user type
+          Widget destinationScreen = _getDestinationScreen(userType);
+
+          // Navigate to the appropriate dashboard with combined animations
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
@@ -355,89 +380,40 @@ class RegisterScreenState extends State<RegisterScreen>
                 opacity: animation,
                 child: ScaleTransition(
                   scale: animation,
-                  child: const HomeScreen(),
+                  child: AnimatedBuilder(
+                    animation: _rotateAnimation,
+                    builder: (context, child) => Transform.rotate(
+                      angle: _rotateAnimation.value,
+                      child: child,
+                    ),
+                    child: destinationScreen,
+                  ),
                 ),
               ),
               transitionDuration: const Duration(milliseconds: 800),
             ),
           );
+        } else {
+          // Stop rotation animation
+          _rotateController.stop();
+
+          // Pop loading screen
+          Navigator.pop(context);
+          _handleFailedAttempt();
         }
       } catch (e) {
+        // Stop rotation animation
+        _rotateController.stop();
+
         // Pop loading screen
         Navigator.pop(context);
+        setState(() {
+          error = 'Error during registration: ${e.toString()}';
+          _isLoading = false;
+        });
         _handleFailedAttempt();
       }
     }
-  }
-
-  void _handleFailedAttempt() {
-    setState(() {
-      _failedAttempts++;
-      _lastAttemptTime = DateTime.now();
-      error = 'Registration failed. Please try again.';
-      _isLoading = false;
-    });
-  }
-
-  // Add this method to show user type selection dialog
-  Future<String?> _showUserTypeDialog() {
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        String? selectedType = userType;
-
-        return AlertDialog(
-          title: const Text('Select User Type'),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Theme.of(context).cardColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: selectedType,
-                    isExpanded: true,
-                    items: ['Landlord', 'Tenant', 'Agent', 'Admin']
-                        .map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        selectedType = newValue!;
-                      });
-                    },
-                  ),
-                ),
-              );
-            },
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            ElevatedButton(
-              child: const Text('Continue'),
-              onPressed: () => Navigator.of(context).pop(selectedType),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _handleGoogleSignIn() async {
@@ -453,25 +429,38 @@ class RegisterScreenState extends State<RegisterScreen>
     });
 
     try {
+      // Show loading screen with combined animations (matching _handleSubmit)
       Navigator.push(
         context,
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
               FadeTransition(
             opacity: animation,
-            child: const LoadingScreen(
-              message: "Signing in with Google",
+            child: AnimatedBuilder(
+              animation: _rotateAnimation,
+              builder: (context, child) => Transform.rotate(
+                angle: _rotateAnimation.value,
+                child: child,
+              ),
+              child: const LoadingScreen(
+                message: "Signing in with Google",
+              ),
             ),
           ),
           transitionDuration: const Duration(milliseconds: 500),
         ),
       );
 
+      // Start rotation animation (matching _handleSubmit)
+      _rotateController.repeat();
+
       UserCredential? userCredential;
 
       if (selectedUserType == 'Admin') {
         final adminCode = await _showAdminCodeDialog();
         if (adminCode == null) {
+          // Stop rotation animation
+          _rotateController.stop();
           Navigator.pop(context);
           setState(() {
             _isLoading = false;
@@ -569,6 +558,8 @@ class RegisterScreenState extends State<RegisterScreen>
 
         // Verify admin status
         if (userType == 'Admin' && !isAdminVerified) {
+          // Stop rotation animation
+          _rotateController.stop();
           await _auth.signOut();
           setState(() {
             error = 'Admin verification failed';
@@ -577,11 +568,15 @@ class RegisterScreenState extends State<RegisterScreen>
           return;
         }
 
+        // Stop rotation animation (matching _handleSubmit)
+        await _rotateController.forward();
+
         Navigator.pop(context); // Pop loading screen
 
-        // Navigate to appropriate dashboard
+        // Get the destination screen based on user type
         Widget destinationScreen = _getDestinationScreen(userType);
 
+        // Navigate with combined animations (matching _handleSubmit)
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
@@ -590,13 +585,22 @@ class RegisterScreenState extends State<RegisterScreen>
               opacity: animation,
               child: ScaleTransition(
                 scale: animation,
-                child: destinationScreen,
+                child: AnimatedBuilder(
+                  animation: _rotateAnimation,
+                  builder: (context, child) => Transform.rotate(
+                    angle: _rotateAnimation.value,
+                    child: child,
+                  ),
+                  child: destinationScreen,
+                ),
               ),
             ),
             transitionDuration: const Duration(milliseconds: 800),
           ),
         );
       } else {
+        // Stop rotation animation
+        _rotateController.stop();
         Navigator.pop(context);
         setState(() {
           error = 'Failed to sign in with Google';
@@ -605,6 +609,8 @@ class RegisterScreenState extends State<RegisterScreen>
         _handleFailedAttempt();
       }
     } catch (e) {
+      // Stop rotation animation
+      _rotateController.stop();
       Navigator.pop(context);
       setState(() {
         error = 'Error during sign in: ${e.toString()}';
@@ -629,7 +635,66 @@ class RegisterScreenState extends State<RegisterScreen>
     }
   }
 
-// Add this method to show admin code input dialog
+  Future<String?> _showUserTypeDialog() {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        String? selectedType = userType;
+
+        return AlertDialog(
+          title: const Text('Select User Type'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Theme.of(context).cardColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedType,
+                    isExpanded: true,
+                    items: ['Landlord', 'Tenant', 'Agent', 'Admin']
+                        .map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedType = newValue!;
+                      });
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('Continue'),
+              onPressed: () => Navigator.of(context).pop(selectedType),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<String?> _showAdminCodeDialog() {
     final adminCodeController = TextEditingController();
 
@@ -661,6 +726,15 @@ class RegisterScreenState extends State<RegisterScreen>
         );
       },
     );
+  }
+
+  void _handleFailedAttempt() {
+    setState(() {
+      _failedAttempts++;
+      _lastAttemptTime = DateTime.now();
+      error = 'Registration failed. Please try again.';
+      _isLoading = false;
+    });
   }
 
   List<Step> buildSteps() {
